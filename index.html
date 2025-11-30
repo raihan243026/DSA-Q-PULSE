@@ -1,0 +1,1049 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>DSA Question Analyzer Dashboard (V2)</title>
+    <!-- Load Tailwind CSS from CDN for styling -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Load Lucide icons -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&display=swap" rel="stylesheet">
+    <style>
+        /* --- Theme Definitions --- */
+        :root {
+            /* Default: Red Theme (Dark Mode) */
+            --bg-color: #1a202c; /* Blackish/Dark Gray */
+            --text-color: #f7fafc; /* Light Text */
+            --nav-color: #2d3748; /* Slightly lighter nav */
+            --accent-color: #ef4444; /* Bright Red */
+            --card-bg: #2d3748; /* Darker card */
+            --input-bg: #4a5568;
+            --input-text: #f7fafc;
+        }
+        .theme-light {
+            --bg-color: #f7fafc; /* Light background */
+            --text-color: #1a202c; /* Dark text */
+            --nav-color: #ffffff; /* White navbar */
+            --accent-color: #10b981; /* Green Accent */
+            --card-bg: #ffffff; /* White card */
+            --input-bg: #ffffff;
+            --input-text: #1a202c;
+        }
+        .theme-black {
+            --bg-color: #000000; /* True Black */
+            --text-color: #ffffff; /* White text */
+            --nav-color: #111827; /* Near Black nav */
+            --accent-color: #3b82f6; /* Blue Accent */
+            --card-bg: #1f2937; /* Dark Gray card */
+            --input-bg: #374151;
+            --input-text: #ffffff;
+        }
+
+        /* --- Global Styles --- */
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            transition: background-color 0.4s ease, color 0.4s ease;
+        }
+        nav {
+            background-color: var(--nav-color);
+            box-shadow: 0 5px 15px -3px rgba(0, 0, 0, 0.2);
+        }
+        .card {
+            background-color: var(--card-bg);
+            border: 1px solid var(--accent-color);
+            box-shadow: 0 8px 15px -5px rgba(0, 0, 0, 0.3);
+            transition: all 0.3s ease;
+        }
+        .card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 12px 20px -5px rgba(0, 0, 0, 0.4);
+        }
+        .accent-text {
+            color: var(--accent-color);
+        }
+        .accent-bg {
+            background-color: var(--accent-color);
+            color: white;
+        }
+        input[type="text"], select {
+            background-color: var(--input-bg) !important;
+            color: var(--input-text) !important;
+            border-color: var(--accent-color) !important;
+        }
+        /* Style range slider track and thumb */
+        input[type="range"]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            width: 16px;
+            height: 16px;
+            border-radius: 50%;
+            background: var(--accent-color);
+            cursor: pointer;
+        }
+        input[type="range"]::-webkit-slider-runnable-track {
+            background: var(--card-bg);
+            border: 1px solid var(--accent-color);
+            border-radius: 10px;
+        }
+        .text-question {
+             /* Preserve white space for question formatting */
+            white-space: pre-wrap; 
+        }
+    </style>
+</head>
+<body id="app-body" class="theme-red">
+
+    <!-- Navbar -->
+    <nav class="sticky top-0 z-50 p-4 transition-colors duration-400">
+        <div class="max-w-7xl mx-auto flex justify-between items-center">
+            <h1 class="text-3xl font-extrabold accent-text tracking-tight">DSA Q-PULSE</h1>
+            <div class="flex items-center space-x-4">
+                <input type="text" id="search-input" onkeyup="filterQuestions()" placeholder="Search questions or topics..."
+                       class="p-2 border rounded-lg focus:ring-2 focus:ring-[var(--accent-color)] w-32 sm:w-64 transition duration-300">
+
+                <!-- Theme Switcher -->
+                <button id="theme-switcher" onclick="toggleTheme()"
+                        class="p-2 rounded-full hover:opacity-80 transition duration-300 accent-bg shadow-md"
+                        title="Change Theme (Red, Light, Black)">
+                    <i data-lucide="droplet" class="w-6 h-6 text-white"></i>
+                </button>
+            </div>
+        </div>
+    </nav>
+
+    <main class="max-w-7xl mx-auto p-4 sm:p-6 lg:p-8">
+
+        <!-- Analyzer Summary Section -->
+        <section class="mb-10 grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-6">
+            <div class="card rounded-2xl p-6 text-center shadow-lg">
+                <p class="text-sm font-semibold opacity-80">Total Unique Questions</p>
+                <div class="text-5xl font-extrabold accent-text mt-2" id="total-questions">0</div>
+            </div>
+            <div class="card rounded-2xl p-6 text-center shadow-lg">
+                <p class="text-sm font-semibold opacity-80">Repeated/Common Qs</p>
+                <div class="text-5xl font-extrabold accent-text mt-2" id="common-questions">0</div>
+            </div>
+            <div class="card rounded-2xl p-6 text-center shadow-lg">
+                <p class="text-sm font-semibold opacity-80">New Qs (Latest Sem)</p>
+                <div class="text-5xl font-extrabold accent-text mt-2" id="new-questions">0</div>
+            </div>
+        </section>
+
+        <!-- Filter and Question List Section -->
+        <section class="flex flex-col lg:flex-row gap-8">
+
+            <!-- Filter Sidebar -->
+            <div class="lg:w-1/4 card rounded-2xl p-6 sticky top-20 h-fit transition duration-300">
+                <h2 class="text-xl font-bold mb-4 border-b-2 pb-2 accent-text">Refine Results</h2>
+
+                <div class="space-y-6">
+                    <!-- Semester Filter -->
+                    <div>
+                        <label class="block text-sm font-medium mb-2">Filter by Semester</label>
+                        <select id="semester-filter" onchange="filterQuestions()" class="w-full p-2 border-2 rounded-xl focus:ring-2 focus:ring-[var(--accent-color)] transition duration-300">
+                            <option value="all">All Semesters</option>
+                        </select>
+                    </div>
+
+                    <!-- Marks Filter -->
+                    <div>
+                        <label class="block text-sm font-medium mb-2">Minimum Marks: <span id="marks-value" class="font-bold accent-text">3</span></label>
+                        <input type="range" id="marks-filter" min="2" max="10" value="3" oninput="document.getElementById('marks-value').innerText=this.value; filterQuestions();" class="w-full h-2 rounded-lg cursor-pointer transition duration-300">
+                    </div>
+
+                    <!-- Importance Filter -->
+                    <div>
+                        <label class="block text-sm font-medium mb-2">Question Type</label>
+                        <div class="flex flex-col space-y-3">
+                            <label class="inline-flex items-center">
+                                <input type="checkbox" id="filter-common" onchange="filterQuestions()" class="form-checkbox h-5 w-5 rounded-md accent-text" checked>
+                                <span class="ml-3 text-base">Show Common/Repeated</span>
+                            </label>
+                            <label class="inline-flex items-center">
+                                <input type="checkbox" id="filter-diagram" onchange="filterQuestions()" class="form-checkbox h-5 w-5 rounded-md accent-text">
+                                <span class="ml-3 text-base">Requires Diagram/Sketch</span>
+                            </label>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Question List -->
+            <div class="lg:w-3/4">
+                <div id="questions-list" class="space-y-6">
+                    <p id="no-results" class="hidden text-center text-2xl p-10 opacity-70">
+                        <i data-lucide="frown" class="w-8 h-8 mx-auto mb-2 accent-text"></i><br>
+                        No questions found matching your criteria. Try adjusting the filters.
+                    </p>
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <!-- Modal for Diagram Preview -->
+    <div id="diagram-modal" class="fixed inset-0 bg-black bg-opacity-70 backdrop-blur-sm hidden items-center justify-center z-[100]" onclick="closeModal()">
+        <div class="bg-white text-gray-900 rounded-xl p-6 max-w-2xl w-11/12 mx-4 shadow-2xl" onclick="event.stopPropagation()">
+            <div class="flex justify-between items-center border-b pb-3 mb-4">
+                <h3 class="text-xl font-bold text-gray-800">Required Sketch/Diagram</h3>
+                <button onclick="closeModal()" class="text-gray-500 hover:text-red-600 transition">
+                    <i data-lucide="x" class="w-6 h-6"></i>
+                </button>
+            </div>
+            <div id="modal-content" class="text-center">
+                <!-- Content injected here -->
+            </div>
+            <p class="text-sm mt-4 p-2 bg-yellow-100 text-yellow-800 rounded-lg">
+                **Note:** This is a dynamic instructional placeholder indicating the type of diagram required for the question.
+                You would draw this based on the problem statement.
+            </p>
+        </div>
+    </div>
+
+    <script>
+        // Data Structure to hold questions extracted from the PDF (Same as previous version)
+        const allQuestions = [
+            // Spring 2025 (Latest)
+            {
+                id: 1,
+                text: "What is a linked list? Compare singly linked list and doubly linked list with example diagrams.",
+                sem: "Spring 2025",
+                marks: 4,
+                diagram: true,
+                diagramContext: "Singly Linked List vs Doubly Linked List Node Structure",
+                topic: "Linked List"
+            },
+            {
+                id: 2,
+                text: "You are given a singly linked list containing the following sequence of integers: L-7-13-21-34-55-89 NULL. i) Add 134 at the end. ii) Delete 34. Now, Write the algorithm of the following operations.",
+                sem: "Spring 2025",
+                marks: 6,
+                diagram: false,
+                topic: "Linked List Operations"
+            },
+            {
+                id: 3,
+                text: "Traverse the tree (with root 8) in Pre-order and Post-order manner and explain the difference. [Image 1 of a Binary Tree]",
+                sem: "Spring 2025",
+                marks: 6,
+                diagram: true,
+                diagramContext: "A general Binary Tree Structure with root 8.",
+                topic: "Tree Traversal"
+            },
+            {
+                id: 4,
+                text: "You are given the following list of integers in the order they are inserted into a Binary Search Tree (BST): {45, 20, 60, 10, 30, 50, 70, 25, 35, 65}. Now, Write the algorithm of the following operations.",
+                sem: "Spring 2025",
+                marks: 4,
+                diagram: false,
+                topic: "Binary Search Tree (BST)"
+            },
+            {
+                id: 5,
+                text: "For the given graph (0-1-2-3-4-5): i) Define adjacency matrix for the given graph. ii) Show each step for DFS traversal of the graph from node 0. [Image 2 of a Directed Graph]",
+                sem: "Spring 2025",
+                marks: 10,
+                diagram: true,
+                diagramContext: "Directed Graph with nodes 0 to 5 for DFS traversal.",
+                topic: "Graph Traversal/DFS"
+            },
+            {
+                id: 6,
+                text: "If you need to find a value among 17million sorted data, which searching technique would you prefer and why?",
+                sem: "Spring 2025",
+                marks: 4,
+                diagram: false,
+                topic: "Searching Technique Comparison"
+            },
+            {
+                id: 7,
+                text: "If a list has 1000 elements, how many maximum comparisons will Binary Search take to find an element (or declare not found)? Show steps.",
+                sem: "Spring 2025",
+                marks: 3,
+                diagram: false,
+                topic: "Binary Search Analysis"
+            },
+            {
+                id: 8,
+                text: "Compare Linear Search and Binary Search in terms of time complexity and efficiency.",
+                sem: "Spring 2025",
+                marks: 3,
+                diagram: false,
+                topic: "Searching Comparison"
+            },
+            {
+                id: 9,
+                text: "Assume a hash table of size 5. Create a hash function to store the keys - 27, 17, 5, 9, 12. Show the stored key in the hash table.",
+                sem: "Spring 2025",
+                marks: 5,
+                diagram: false,
+                topic: "Hashing"
+            },
+            {
+                id: 10,
+                text: "What happens if more than one key has same hash index? How can it be resolved?",
+                sem: "Spring 2025",
+                marks: 5,
+                diagram: false,
+                topic: "Hashing Collision"
+            },
+            {
+                id: 11,
+                text: "Explain how Insertion Sort works with a step-by-step trace on [7, 5, 3, 4, 1, 2, 6].",
+                sem: "Spring 2025",
+                marks: 5,
+                diagram: false,
+                topic: "Sorting - Insertion Sort"
+            },
+            {
+                id: 12,
+                text: "Build a max-heap from the array [3, 5, 9, 6, 8, 10] and then show the sorted array using Heap Sort.",
+                sem: "Spring 2025",
+                marks: 5,
+                diagram: false,
+                topic: "Sorting - Heap Sort"
+            },
+            {
+                id: 13,
+                text: "Explain the difference between top-down (memorization) and bottom-up (tabulation) approaches in dynamic programming.",
+                sem: "Spring 2025",
+                marks: 2,
+                diagram: false,
+                topic: "Dynamic Programming"
+            },
+            {
+                id: 14,
+                text: "Given the following graph, trace Dijkstra's algorithm step-by-step starting from node A and show the final shortest distance to all other nodes. [Image 3 of a Weighted Graph]",
+                sem: "Spring 2025",
+                marks: 8,
+                diagram: true,
+                diagramContext: "Weighted Graph for Dijkstra's Algorithm starting at A.",
+                topic: "Graph - Dijkstra's Algorithm"
+            },
+
+            // Autumn 2024
+            {
+                id: 15,
+                text: "Define the following terms with respect to tree: i. Strictly Binary Tree ii. Sibling iii. Degree",
+                sem: "Autumn 2024",
+                marks: 3,
+                diagram: false,
+                topic: "Tree Terminology"
+            },
+            {
+                id: 16,
+                text: "Find Inorder and Postorder traversal for the given binary tree (with root P). [Image 4 of a Binary Tree]",
+                sem: "Autumn 2024",
+                marks: 3,
+                diagram: true,
+                diagramContext: "Binary Tree with root P for Inorder/Postorder traversal.",
+                topic: "Tree Traversal"
+            },
+            {
+                id: 17,
+                text: "Given the postorder traversal of a Binary Search Tree (BST) as follows: 10, 20, 40, 30, 60, 50, 75, 85, 80, 95, 110, 130, 120, 100, 90, 70. Construct the BST from the given postorder traversal. Show each step of the construction process and draw the final BST.",
+                sem: "Autumn 2024",
+                marks: 4,
+                diagram: false,
+                topic: "Binary Search Tree (BST) Construction"
+            },
+            {
+                id: 18,
+                text: "\"Linked List is a flexible and dynamic data structure\" justify the statement with respect to other data structures.",
+                sem: "Autumn 2024",
+                marks: 4,
+                diagram: false,
+                topic: "Linked List Advantages"
+            },
+            {
+                id: 19,
+                text: "Analyze the deletion process in a doubly linked list for the following cases: 1) Deleting the head node 2) Deleting a node in the middle",
+                sem: "Autumn 2024",
+                marks: 6,
+                diagram: false,
+                topic: "Linked List Deletion"
+            },
+            {
+                id: 20,
+                text: "How would you detect if a given linked list is circular or not?",
+                sem: "Autumn 2024",
+                marks: 4,
+                diagram: true,
+                diagramContext: "Diagram of a Circular Linked List for detection.",
+                topic: "Linked List Operations"
+            },
+            {
+                id: 21,
+                text: "Write an algorithm to insert a new node with value 35 after the node with value 30. Illustrate the modified linked list. [Image 5 of a Circular Linked List]",
+                sem: "Autumn 2024",
+                marks: 6,
+                diagram: true,
+                diagramContext: "Circular Linked List modification illustration.",
+                topic: "Linked List Insertion"
+            },
+            {
+                id: 22,
+                text: "What is a spanning tree? Explain the difference between a spanning tree and a minimum spanning tree.",
+                sem: "Autumn 2024",
+                marks: 4,
+                diagram: false,
+                topic: "Graph - Spanning Tree"
+            },
+            {
+                id: 23,
+                text: "Apply Dijkstra's algorithm and find the shortest path from the node S as the starting node to all other vertices in the following graph. Provide a list of the order in which the nodes were visited as well as the table showing the shortest path. [Image 6 of a Directed Weighted Graph]",
+                sem: "Autumn 2024",
+                marks: 6,
+                diagram: true,
+                diagramContext: "Directed Weighted Graph for Dijkstra's Algorithm starting at S.",
+                topic: "Graph - Dijkstra's Algorithm"
+            },
+            {
+                id: 24,
+                text: "What is a collision in hashing? Why does it occur?",
+                sem: "Autumn 2024",
+                marks: 3,
+                diagram: false,
+                topic: "Hashing Collision"
+            },
+            {
+                id: 25,
+                text: "Design a hash table of size 10 and resolve collisions using quadratic probing with the formula $h'(k,l)=(h(k)+l^2) \\text{ mod } 10$. Insert the keys 15, 25, 35, 45, and 55. Evaluate the efficiency of the probing technique by calculating the number of probes required for each key.",
+                sem: "Autumn 2024",
+                marks: 7,
+                diagram: false,
+                topic: "Hashing - Quadratic Probing"
+            },
+            {
+                id: 26,
+                text: "Write an algorithm for Selection sort.",
+                sem: "Autumn 2024",
+                marks: 3,
+                diagram: false,
+                topic: "Sorting - Selection Sort"
+            },
+            {
+                id: 27,
+                text: "Compare the number of swaps and comparisons made by the Bubble Sort and Selection Sort algorithms for the Input array [64, 34, 25, 12, 22, 11, 90]. Which algorithm performs fewer swaps and why?",
+                sem: "Autumn 2024",
+                marks: 7,
+                diagram: false,
+                topic: "Sorting Comparison"
+            },
+            {
+                id: 28,
+                text: "Can you think of a situation where linear search would be more practical or efficient than binary search?",
+                sem: "Autumn 2024",
+                marks: 3,
+                diagram: false,
+                topic: "Searching Comparison"
+            },
+            {
+                id: 29,
+                text: "A sorted list is given below- sorted_list = [3,7, 10, 14, 18, 21, 29, 35, 42, 50, 57, 63, 70, 77, 84, 91, 98] I. If the target element is 42, how many iterations does the binary search take to find the element? Describe each iteration. II. Assume the target element is 5, which is not in the list. What will be the final state of the low and high pointers when the algorithm concludes the element Is not present?",
+                sem: "Autumn 2024",
+                marks: 7,
+                diagram: false,
+                topic: "Binary Search Analysis"
+            },
+
+            // Spring 2024 (Common with Autumn 2024 and others)
+            {
+                id: 30,
+                text: "Define tree traversal and find preorder and postorder traversal for the given binary tree (with root 15). [Image 7 of a Binary Tree]",
+                sem: "Spring 2024",
+                marks: 5,
+                diagram: true,
+                diagramContext: "Binary Tree with root 15 for Preorder/Postorder traversal.",
+                topic: "Tree Traversal"
+            },
+            {
+                id: 31,
+                text: "Given the postorder traversal of a Binary Search Tree (BST) as follows: [2, 4, 3, 8, 7, 5]. Construct the Binary Search Tree (BST) from the given postorder traversal. Show each step of the construction process and draw the final BST.",
+                sem: "Spring 2024",
+                marks: 5,
+                diagram: false,
+                topic: "Binary Search Tree (BST) Construction"
+            },
+            {
+                id: 32,
+                text: "How would you detect If a given linked list is circular or not?",
+                sem: "Spring 2024",
+                marks: 4,
+                diagram: true,
+                diagramContext: "Diagram of a Circular Linked List for detection.",
+                topic: "Linked List Operations"
+            },
+            {
+                id: 33,
+                text: "Write an algorithm to Insert a new node with a value of 35 after the node with a value of 30. Illustrate the modifled linked list. [Image 5 of a Circular Linked List]",
+                sem: "Spring 2024",
+                marks: 6,
+                diagram: true,
+                diagramContext: "Circular Linked List modification illustration.",
+                topic: "Linked List Insertion"
+            },
+            {
+                id: 34,
+                text: "Describe the structure of a doubly linked list. How does it differ from a singly linked list?",
+                sem: "Spring 2024",
+                marks: 4,
+                diagram: false,
+                topic: "Linked List Comparison"
+            },
+            {
+                id: 35,
+                text: "Write a function to Insert a new node at the beginning of a doubly linked list. How does this differ from Insertion In a singly linked list?",
+                sem: "Spring 2024",
+                marks: 6,
+                diagram: false,
+                topic: "Linked List Insertion"
+            },
+            {
+                id: 36,
+                text: "Find minimum spanning tree for the given graph below using prim's algorithm (start from vertex A). [Image 8 of a Weighted Graph]",
+                sem: "Spring 2024",
+                marks: 4,
+                diagram: true,
+                diagramContext: "Weighted Graph for Prim's Algorithm starting at A.",
+                topic: "Graph - Prim's Algorithm (MST)"
+            },
+            {
+                id: 37,
+                text: "Apply Dijkstra's algorithm and find the shortest path from node S as the starting node to all other vertices in the following graph. Provide a list of the order in which the nodes were visited as well as the table showing the shortest path. [Image 9 of a Directed Weighted Graph]",
+                sem: "Spring 2024",
+                marks: 6,
+                diagram: true,
+                diagramContext: "Directed Weighted Graph for Dijkstra's Algorithm starting at S.",
+                topic: "Graph - Dijkstra's Algorithm"
+            },
+            {
+                id: 38,
+                text: "Provide an example of one real-world problem that Dijkstra's algorithm solves.",
+                sem: "Spring 2024",
+                marks: 3,
+                diagram: false,
+                topic: "Graph - Dijkstra's Application"
+            },
+            {
+                id: 39,
+                text: "Define collision in hashing. What is the use of a hash function?",
+                sem: "Spring 2024",
+                marks: 3,
+                diagram: false,
+                topic: "Hashing Collision"
+            },
+            {
+                id: 40,
+                text: "Take an Initially empty hash table with ten slots, with hash function $h(k)=k \\text{ mod } 10$, and collisions are resolved by linear probing with hash function $h'(k,l)=(h(k)+l)$. Sketch what happens when Inserting the following sequence of keys into It: 35, 2, 18, 6, 3, 10, 8, 5, 11, 19. And find the maximum probe value ($l$).",
+                sem: "Spring 2024",
+                marks: 7,
+                diagram: false,
+                topic: "Hashing - Linear Probing"
+            },
+            {
+                id: 41,
+                text: "What are the various factors to be considered In deciding a sorting algorithm?",
+                sem: "Spring 2024",
+                marks: 3,
+                diagram: false,
+                topic: "Sorting - Factors"
+            },
+            {
+                id: 42,
+                text: "Examine the algorithm for Insertion sort and use it to sort the letters of the word \"EDUCATION\" In alphabetical order and show each pass separately.",
+                sem: "Spring 2024",
+                marks: 7,
+                diagram: false,
+                topic: "Sorting - Insertion Sort"
+            },
+
+            // Autumn 2023 (Common with Spring 2024 and others)
+            {
+                id: 43,
+                text: "Show the resultant BST after applying the following operations in sequence on the given tree (with root 8): (i) Delete 8, (ii) Insert 9 and (iii) Delete 7. [Image 10 of a Binary Search Tree]",
+                sem: "Autumn 2023",
+                marks: 4,
+                diagram: true,
+                diagramContext: "Binary Search Tree (BST) for delete/insert operations.",
+                topic: "Binary Search Tree (BST) Operations"
+            },
+            {
+                id: 44,
+                text: "Given In-order and Pre-order traversal, find post-order traversal. In-order: Y, B, K, C, F, A, G, X, E, D, H, Z. Pre-order: G, B, Y, A, C, K F, X, D, E, Z, H.",
+                sem: "Autumn 2023",
+                marks: 6,
+                diagram: false,
+                topic: "Tree Traversal Construction"
+            },
+            {
+                id: 45,
+                text: "What is a header node? Explain its importance.",
+                sem: "Autumn 2023",
+                marks: 4,
+                diagram: false,
+                topic: "Linked List Header Node"
+            },
+            {
+                id: 46,
+                text: "Write user user-defined C function to insert and delete a node at/from the end in a doubly linked list.",
+                sem: "Autumn 2023",
+                marks: 6,
+                diagram: false,
+                topic: "Linked List Operations"
+            },
+            {
+                id: 47,
+                text: "Describe the advantages of a linked list over the array.",
+                sem: "Autumn 2023",
+                marks: 4,
+                diagram: false,
+                topic: "Linked List Advantages"
+            },
+            {
+                id: 48,
+                text: "Write a user-defined C function to insert and delete a node at/from a specific location in a singly linked list.",
+                sem: "Autumn 2023",
+                marks: 6,
+                diagram: false,
+                topic: "Linked List Operations"
+            },
+            {
+                id: 49,
+                text: "Explain the following with reference to graphs. (i) Weighted Graph and (ii) Connected Graph.",
+                sem: "Autumn 2023",
+                marks: 4,
+                diagram: false,
+                topic: "Graph Terminology"
+            },
+            {
+                id: 50,
+                text: "Apply Dijkstra's algorithm for the following graph with Node S as the starting node. [Image 6 of a Directed Weighted Graph]",
+                sem: "Autumn 2023",
+                marks: 6,
+                diagram: true,
+                diagramContext: "Directed Weighted Graph for Dijkstra's Algorithm starting at S.",
+                topic: "Graph - Dijkstra's Algorithm"
+            },
+            {
+                id: 51,
+                text: "How can open addressing be used for collision resolution?",
+                sem: "Autumn 2023",
+                marks: 4,
+                diagram: false,
+                topic: "Hashing Collision Resolution"
+            },
+            {
+                id: 52,
+                text: "Demonstrate what happens when we Insert the keys 5, 28, 19, 15, 20, 33, 12, 17; and 10 into a hash table with collisions resolved by chaining. Let the table have 9 slots, and the hash function is $h(k)=k \\text{ mod } 9$. What is the resultant hash table and calculate the load factor?",
+                sem: "Autumn 2023",
+                marks: 6,
+                diagram: false,
+                topic: "Hashing - Chaining"
+            },
+            {
+                id: 53,
+                text: "Write an algorithm for insertion sort.",
+                sem: "Autumn 2023",
+                marks: 4,
+                diagram: false,
+                topic: "Sorting - Insertion Sort"
+            },
+            {
+                id: 54,
+                text: "\"If no interchanges occurred, then all the elements must be sorted and no further passes are required.\" Which sorting technique works on this principle? Apply the same sorting technique on the following data to sort them in ascending order: 11, 15, 13, 14, 2, 8, 10.",
+                sem: "Autumn 2023",
+                marks: 6,
+                diagram: false,
+                topic: "Sorting - Bubble Sort"
+            },
+            {
+                id: 55,
+                text: "Write an algorithm for sequential search.",
+                sem: "Autumn 2023",
+                marks: 4,
+                diagram: false,
+                topic: "Searching - Sequential Search"
+            },
+            {
+                id: 56,
+                text: "\"Binary search is a searching algorithm that works efficiently with a sorted list\" - Justify the statement by applying the technique to the following data 1, 3, 5, 7, 9, 11, 13, 15, 17, 19, 21 and search for the value 19.",
+                sem: "Autumn 2023",
+                marks: 6,
+                diagram: false,
+                topic: "Searching - Binary Search"
+            },
+
+            // Spring 2023 (Common with Autumn 2024 and others)
+            {
+                id: 57,
+                text: "Define terms with respect to tree: I. Strictly Binary Tree II. Sibling III. Degree",
+                sem: "Spring 2023",
+                marks: 3,
+                diagram: false,
+                topic: "Tree Terminology"
+            },
+            {
+                id: 58,
+                text: "Construct Binary Search Tree (BST) for the following sequence and find In-order traversal for the same: 38, 13, 51, 10, 12, 40, 84, 25, 89, 37, 66, 95",
+                sem: "Spring 2023",
+                marks: 7,
+                diagram: false,
+                topic: "Binary Search Tree (BST) Construction"
+            },
+            {
+                id: 59,
+                text: "\"Linked List is a flexible and dynamic data structure\" Justify the statement with respect to other data structures.",
+                sem: "Spring 2023",
+                marks: 3,
+                diagram: false,
+                topic: "Linked List Advantages"
+            },
+            {
+                id: 60,
+                text: "Write an algorithm to I. Insert a node in a Circular linked list at the FIRST position. II. Delete a node from the END of the Circular linked list.",
+                sem: "Spring 2023",
+                marks: 7,
+                diagram: false,
+                topic: "Linked List Operations"
+            },
+            {
+                id: 61,
+                text: "Explain advantages of Doubly Linked List over Singly Linked List.",
+                sem: "Spring 2023",
+                marks: 3,
+                diagram: false,
+                topic: "Linked List Comparison"
+            },
+            {
+                id: 62,
+                text: "Write an algorithm to I. Insert a new node in a Doubly linked list after a given node. II. Delete a node in a Doubly linked list after a given node.",
+                sem: "Spring 2023",
+                marks: 7,
+                diagram: false,
+                topic: "Linked List Operations"
+            },
+            {
+                id: 63,
+                text: "Explain Minimum Spanning Tree (MST) with it's applications.",
+                sem: "Spring 2023",
+                marks: 3,
+                diagram: false,
+                topic: "Graph - MST"
+            },
+            {
+                id: 64,
+                text: "Apply Kruskal's algorithm in the graph given below to find minimum spanning tree and calculate total cost of the tree. [Image 11 of a Weighted Graph]",
+                sem: "Spring 2023",
+                marks: 7,
+                diagram: true,
+                diagramContext: "Weighted Graph for Kruskal's Algorithm.",
+                topic: "Graph - Kruskal's Algorithm (MST)"
+            },
+            {
+                id: 65,
+                text: "Discuss the qualities of a good hash function.",
+                sem: "Spring 2023",
+                marks: 3,
+                diagram: false,
+                topic: "Hashing - Hash Function"
+            },
+            {
+                id: 66,
+                text: "Build a chained hash table of 10 memory locations. Insert the keys: 131, 3, 4, 21, 61, 24, 7, 97, 8, 9 in hash table using Chaining. Use $h(k)=k \\text{ mod } m, [m=10]$. What is the resultant hash table and calculate the load factor.",
+                sem: "Spring 2023",
+                marks: 7,
+                diagram: false,
+                topic: "Hashing - Chaining"
+            },
+            {
+                id: 67,
+                text: "Compare Sequential Searching with Binary Searching in detail.",
+                sem: "Spring 2023",
+                marks: 3,
+                diagram: false,
+                topic: "Searching Comparison"
+            },
+            {
+                id: 68,
+                text: "Search the number 50 from the given data using Binary Search technique. Illustrate the searching process. 10, 14, 20, 39, 41, 45, 49, 50, 60",
+                sem: "Spring 2023",
+                marks: 7,
+                diagram: false,
+                topic: "Searching - Binary Search"
+            },
+            {
+                id: 69,
+                text: "What do you mean by Internal and External Sorting?",
+                sem: "Spring 2023",
+                marks: 3,
+                diagram: false,
+                topic: "Sorting - Terminology"
+            },
+            {
+                id: 70,
+                text: "Examine the algorithm for Merge Sort and sort the following array: 20, 10, 5, 15, 25, 30, 50, 35",
+                sem: "Spring 2023",
+                marks: 7,
+                diagram: false,
+                topic: "Sorting - Merge Sort"
+            },
+        ];
+
+        let currentTheme = 'red'; // Default theme is dark/red
+        let questionAnalysis = {};
+
+        document.addEventListener('DOMContentLoaded', () => {
+            // Initialize Lucide icons
+            lucide.createIcons();
+            // Perform initial analysis and setup
+            analyzeQuestions();
+            populateSemFilter();
+            filterQuestions();
+            updateTheme(currentTheme);
+        });
+
+        // --- Question Analysis Logic ---
+
+        function analyzeQuestions() {
+            const uniqueQuestions = {};
+            const semesters = new Set();
+            
+            // Define latest semester dynamically
+            const allSems = allQuestions.map(q => q.sem);
+            const sortedSems = Array.from(new Set(allSems)).sort((a, b) => {
+                const [aSeason, aYear] = a.split(' ');
+                const [bSeason, bYear] = b.split(' ');
+                if (aYear !== bYear) return parseInt(bYear) - parseInt(aYear);
+                return bSeason.localeCompare(aSeason);
+            });
+            const latestSem = sortedSems[0] || "N/A";
+
+            let latestSemQuestions = 0;
+
+            // 1. Map questions and collect history
+            allQuestions.forEach(q => {
+                // Remove image tags and mathematical notation from comparison string for accurate matching
+                const normalizedText = q.text.replace(/\[Image\s\d+\s+of[^\]]+\]/g, '').replace(/\$[^\$]+\$/g, '').trim(); 
+                semesters.add(q.sem);
+
+                if (!uniqueQuestions[normalizedText]) {
+                    uniqueQuestions[normalizedText] = [];
+                }
+                uniqueQuestions[normalizedText].push({ sem: q.sem, marks: q.marks, id: q.id, diagram: q.diagram });
+                
+                if (q.sem === latestSem) {
+                    latestSemQuestions++;
+                }
+            });
+
+            // 2. Calculate common and new questions
+            let commonCount = 0;
+            let newCount = 0;
+            const latestSemQuestionTexts = new Set();
+            
+            Object.keys(uniqueQuestions).forEach(text => {
+                const history = uniqueQuestions[text];
+                if (history.length > 1) {
+                    commonCount++;
+                }
+                // Check if this question appeared *only* in the latest semester
+                if (history.some(h => h.sem === latestSem)) {
+                    // Check if the history list contains only one entry (the latest sem)
+                    if (history.length === 1) {
+                        newCount++;
+                    }
+                }
+            });
+            
+            const totalUnique = Object.keys(uniqueQuestions).length;
+
+            questionAnalysis = {
+                uniqueQuestions: uniqueQuestions,
+                semesters: sortedSems,
+                latestSem: latestSem,
+                totalUnique: totalUnique,
+                commonCount: commonCount,
+                newCount: newCount
+            };
+            
+            // Update Summary Cards
+            document.getElementById('total-questions').innerText = questionAnalysis.totalUnique;
+            document.getElementById('common-questions').innerText = questionAnalysis.commonCount;
+            document.getElementById('new-questions').innerText = questionAnalysis.newCount;
+        }
+
+        function populateSemFilter() {
+            const select = document.getElementById('semester-filter');
+            questionAnalysis.semesters.forEach(sem => {
+                const option = document.createElement('option');
+                option.value = sem;
+                option.textContent = sem;
+                select.appendChild(option);
+            });
+        }
+        
+        // --- Filtering and Rendering Logic ---
+
+        function filterQuestions() {
+            const listContainer = document.getElementById('questions-list');
+            const searchTerms = document.getElementById('search-input').value.toLowerCase();
+            const selectedSem = document.getElementById('semester-filter').value;
+            const minMarks = parseInt(document.getElementById('marks-filter').value);
+            const showCommon = document.getElementById('filter-common').checked;
+            const showDiagram = document.getElementById('filter-diagram').checked;
+            
+            listContainer.innerHTML = '';
+            let filteredCount = 0;
+            const latestSem = questionAnalysis.latestSem;
+
+            allQuestions.forEach(q => {
+                const normalizedText = q.text.replace(/\[Image\s\d+\s+of[^\]]+\]/g, '').replace(/\$[^\$]+\$/g, '').trim();
+                const history = questionAnalysis.uniqueQuestions[normalizedText];
+                const isRepeated = history && history.length > 1;
+                const isNew = history && history.length === 1 && q.sem === latestSem;
+
+                // 1. Semester Filter
+                const semMatch = selectedSem === 'all' || q.sem === selectedSem;
+
+                // 2. Marks Filter
+                const marksMatch = q.marks >= minMarks;
+
+                // 3. Search Filter
+                const searchMatch = q.text.toLowerCase().includes(searchTerms) || q.topic.toLowerCase().includes(searchTerms);
+
+                // 4. Importance Filter (Only show common if checked, or if it's not common)
+                let importanceMatch = true;
+                if (!showCommon && isRepeated) {
+                    importanceMatch = false; 
+                }
+                
+                // 5. Diagram Filter
+                const diagramMatch = !showDiagram || (showDiagram && q.diagram);
+
+
+                if (semMatch && marksMatch && searchMatch && importanceMatch && diagramMatch) {
+                    const questionCard = createQuestionCard(q, isRepeated, isNew, history);
+                    listContainer.appendChild(questionCard);
+                    filteredCount++;
+                }
+            });
+
+            document.getElementById('no-results').classList.toggle('hidden', filteredCount > 0);
+        }
+
+        function createQuestionCard(q, isRepeated, isNew, history) {
+            const card = document.createElement('div');
+            card.className = 'card rounded-2xl p-6 flex flex-col space-y-4';
+            card.id = `q-${q.id}`;
+
+            const badgeData = getBadgeData(isRepeated, isNew);
+            const historySems = history ? history.map(h => h.sem).filter(sem => sem !== q.sem) : [];
+
+            // Helper to clean up the question text (removing image tags for cleaner display)
+            const cleanText = q.text.replace(/\[Image\s\d+\s+of[^\]]+\]/g, '');
+
+
+            card.innerHTML = `
+                <div class="flex justify-between items-start">
+                    <!-- Badge and Topic -->
+                    <div>
+                        <span class="${badgeData.classes} text-xs font-bold px-3 py-1 rounded-full uppercase tracking-wider shadow-md">
+                            ${badgeData.text}
+                        </span>
+                        <p class="text-sm text-gray-400 mt-2">${q.topic}</p>
+                    </div>
+                    
+                    <!-- Marks -->
+                    <div class="flex flex-col items-center">
+                        <span class="text-xs font-semibold opacity-70">Marks</span>
+                        <span class="text-4xl font-extrabold accent-text">${q.marks}</span>
+                    </div>
+                </div>
+
+                <!-- Question Text -->
+                <p class="text-lg font-semibold text-question flex-grow">${cleanText}</p>
+
+                <!-- Footer/Metadata -->
+                <div class="flex flex-wrap justify-between items-center border-t border-dashed pt-4 mt-auto">
+                    <div class="text-sm font-bold opacity-90">
+                        Semester: <span class="accent-text">${q.sem}</span>
+                    </div>
+                    <div class="flex items-center space-x-3 mt-2 sm:mt-0">
+                        <!-- History Tag -->
+                        ${isRepeated ? `<span class="flex items-center text-sm font-medium opacity-80"><i data-lucide="repeat-2" class="w-4 h-4 mr-1 accent-text"></i> ${history.length}x Repeated</span>` : ''}
+
+                        <!-- Diagram Button -->
+                        ${q.diagram ? `
+                            <button onclick="showModal('${q.diagramContext}')" 
+                                class="flex items-center text-sm font-medium accent-bg hover:opacity-90 px-3 py-1 rounded-full text-white transition duration-300 shadow-md">
+                                <i data-lucide="scan" class="w-4 h-4 mr-1"></i> View Sketch
+                            </button>` 
+                            : ''
+                        }
+                    </div>
+                </div>
+                ${isRepeated && historySems.length > 0 ? `<p class="text-xs text-gray-400 mt-1">Previous Appearances: ${historySems.join(', ')}</p>` : ''}
+            `;
+            
+            // Re-render lucide icons inside the new card
+            lucide.createIcons();
+            
+            return card;
+        }
+
+        function getBadgeData(isRepeated, isNew) {
+            if (isRepeated) {
+                return { text: 'HIGHLY COMMON', classes: 'bg-red-600 text-white' };
+            }
+            if (isNew) {
+                return { text: 'NEW IN LATEST SEM', classes: 'bg-indigo-500 text-white' };
+            }
+            return { text: 'STANDARD QUESTION', classes: 'bg-gray-500 text-white' };
+        }
+
+
+        // --- Theme Switching Logic ---
+
+        const themes = ['red', 'light', 'black']; // Define the cycle
+        function toggleTheme() {
+            const currentIndex = themes.indexOf(currentTheme);
+            const nextIndex = (currentIndex + 1) % themes.length;
+            currentTheme = themes[nextIndex];
+
+            updateTheme(currentTheme);
+            // Re-filter to ensure badge and border colors update based on new accent variable
+            filterQuestions(); 
+        }
+
+        function updateTheme(theme) {
+            const body = document.getElementById('app-body');
+            body.classList.remove('theme-red', 'theme-light', 'theme-black');
+            body.classList.add(`theme-${theme}`);
+        }
+        
+        // --- Modal Logic ---
+
+        function showModal(context) {
+            const modal = document.getElementById('diagram-modal');
+            const modalContent = document.getElementById('modal-content');
+            
+            modalContent.innerHTML = `
+                <div class="p-8 border-4 border-dashed border-gray-300 rounded-lg bg-gray-50">
+                    <i data-lucide="ruler" class="w-12 h-12 text-gray-500 mx-auto mb-4"></i>
+                    <p class="text-xl font-semibold text-gray-700">Drawing Required:</p>
+                    <p class="text-2xl font-extrabold text-red-500 mt-2">${context}</p>
+                </div>
+            `;
+            lucide.createIcons(); // Re-render icons in modal
+            modal.style.display = 'flex';
+        }
+
+        function closeModal() {
+            document.getElementById('diagram-modal').style.display = 'none';
+        }
+
+    </script>
+</body>
+</html>
